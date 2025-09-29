@@ -323,3 +323,27 @@ func (p *PeerConfig) AsIPC() string {
 
 	return s.String()
 }
+
+// AsIPCMasked returns the IPC configuration with preshared keys masked for security.
+func (p *PeerConfig) AsIPCMasked() string {
+	var s strings.Builder
+
+	s.WriteString(fmt.Sprintf("public_key=%s\n", hex.EncodeToString(p.config.PublicKey[:])))
+	if p.config.PresharedKey != nil {
+		s.WriteString(fmt.Sprintf("preshared_key=%s\n", maskKey(hex.EncodeToString(p.config.PresharedKey[:]))))
+	}
+	if p.config.Endpoint != nil {
+		s.WriteString(fmt.Sprintf("endpoint=%s\n", p.config.Endpoint.String()))
+	}
+	if p.endpointDNS != "" {
+		s.WriteString(fmt.Sprintf("endpoint=%s\n", p.endpointDNS))
+	}
+	for _, a := range p.config.AllowedIPs {
+		s.WriteString(fmt.Sprintf("allowed_ip=%s\n", a.String()))
+	}
+	if p.config.PersistentKeepaliveInterval != nil {
+		s.WriteString(fmt.Sprintf("persistent_keepalive_interval=%.0f\n", p.config.PersistentKeepaliveInterval.Seconds()))
+	}
+
+	return s.String()
+}

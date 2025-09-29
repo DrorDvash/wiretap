@@ -46,6 +46,7 @@ type serveCmdConfig struct {
 	simple            bool
 	logging           bool
 	logFile           string
+	showConfig        bool // Flag to control configuration output
 	catchTimeout      uint
 	connTimeout       uint
 	keepaliveIdle     uint
@@ -83,6 +84,7 @@ var serveCmd = serveCmdConfig{
 	simple:            false,
 	logging:           false,
 	logFile:           "wiretap.log",
+	showConfig:        false,
 	catchTimeout:      5 * 1000,
 	connTimeout:       5 * 1000,
 	keepaliveIdle:     60,
@@ -130,6 +132,7 @@ func init() {
 	cmd.Flags().IntP("port", "p", wiretapDefault.port, "listener port to use for relay connections")
 	cmd.Flags().BoolVarP(&serveCmd.quiet, "quiet", "q", serveCmd.quiet, "silence wiretap log messages")
 	cmd.Flags().BoolVarP(&serveCmd.debug, "debug", "d", serveCmd.debug, "enable wireguard log messages")
+	cmd.Flags().BoolVarP(&serveCmd.showConfig, "show-config", "s", serveCmd.showConfig, "print configuration details to stdout")
 	cmd.Flags().BoolVarP(&serveCmd.simple, "simple", "", serveCmd.simple, "disable multihop and multiclient features for a simpler setup")
 	cmd.Flags().BoolVarP(&serveCmd.disableV6, "disable-ipv6", "", serveCmd.disableV6, "disable ipv6")
 	cmd.Flags().BoolVarP(&serveCmd.logging, "log", "l", serveCmd.logging, "enable logging to file")
@@ -418,20 +421,22 @@ func (c serveCmdConfig) Run() {
 		check("failed to make e2ee configuration", err)
 	}
 
-	// Print public key for easier configuration.
-	fmt.Println()
-	fmt.Println("Relay configuration:")
-	fmt.Println(strings.Repeat("─", 32))
-	fmt.Print(configRelay.AsShareableFile())
-	fmt.Println(strings.Repeat("─", 32))
-	if !viper.GetBool("simple") {
+	// Print public key for easier configuration (only if --show-config flag is set).
+	if c.showConfig {
 		fmt.Println()
-		fmt.Println("E2EE configuration:")
+		fmt.Println("Relay configuration:")
 		fmt.Println(strings.Repeat("─", 32))
-		fmt.Print(configE2EE.AsShareableFile())
+		fmt.Print(configRelay.AsShareableFile())
 		fmt.Println(strings.Repeat("─", 32))
+		if !viper.GetBool("simple") {
+			fmt.Println()
+			fmt.Println("E2EE configuration:")
+			fmt.Println(strings.Repeat("─", 32))
+			fmt.Print(configE2EE.AsShareableFile())
+			fmt.Println(strings.Repeat("─", 32))
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 
 	apiAddr, err := netip.ParseAddr(viper.GetString("E2EE.Interface.api"))
 	check("failed to parse API address", err)
@@ -564,7 +569,9 @@ func (c serveCmdConfig) Run() {
 	// Make new relay device.
 	devRelay := device.NewDevice(tunRelay, conn.NewDefaultBind(), device.NewLogger(logger, ""))
 	// Configure wireguard.
-	fmt.Println(configRelay.AsIPC())
+	if c.showConfig {
+		fmt.Println(configRelay.AsIPCMasked())
+	}
 	err = devRelay.IpcSet(configRelay.AsIPC())
 	check("failed to configure relay wireguard device", err)
 	err = devRelay.Up()
@@ -576,7 +583,9 @@ func (c serveCmdConfig) Run() {
 		devE2EE = device.NewDevice(tunE2EE, userspace.NewBind(tnetRelay), device.NewLogger(logger, ""))
 
 		// Configure wireguard.
-		fmt.Println(configE2EE.AsIPC())
+		if c.showConfig {
+			fmt.Println(configE2EE.AsIPCMasked())
+		}
 		err = devE2EE.IpcSet(configE2EE.AsIPC())
 		check("failed to configure e2ee wireguard device", err)
 		err = devE2EE.Up()

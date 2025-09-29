@@ -484,6 +484,27 @@ func (c *Config) AsIPC() string {
 	return s.String()
 }
 
+// maskKey masks the middle portion of a hex key, showing only first 10 and last 10 characters.
+func maskKey(key string) string {
+	if len(key) <= 20 {
+		return key // Don't mask short keys
+	}
+	return key[:10] + "..REDACTED.." + key[len(key)-10:]
+}
+
+// AsIPCMasked returns the IPC configuration with private keys masked for security.
+func (c *Config) AsIPCMasked() string {
+	var s strings.Builder
+
+	s.WriteString(fmt.Sprintf("private_key=%s\n", maskKey(hex.EncodeToString(c.config.PrivateKey[:]))))
+	s.WriteString(fmt.Sprintf("listen_port=%d\n", *c.config.ListenPort))
+	for _, p := range c.peers {
+		s.WriteString(p.AsIPCMasked())
+	}
+
+	return s.String()
+}
+
 func CreateServerCommand(relayConfig Config, e2eeConfig Config, shell Shell, simple bool, disableV6 bool) string {
 	var s strings.Builder
 	var keys []string
