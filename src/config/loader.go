@@ -44,9 +44,27 @@ func LoadFromFile(path string) (bool, error) {
 	return true, err
 }
 
-func TryLoad(configData string, configFile string) error {
+func LoadFromURL(cfg FetchConfig) error {
+	data, err := FetchRemote(cfg)
+	if err != nil {
+		return err
+	}
+	
+	dataStr := strings.TrimSpace(string(data))
+	return LoadFromData(dataStr)
+}
+
+func TryLoad(configData string, configFile string, configURL string, authHeader string, insecure bool) error {
 	if configData != "" {
 		return LoadFromData(configData)
+	}
+	
+	if configURL != "" {
+		return LoadFromURL(FetchConfig{
+			URL:        configURL,
+			AuthHeader: authHeader,
+			Insecure:   insecure,
+		})
 	}
 	
 	if loaded, err := LoadFromEnv(); loaded {

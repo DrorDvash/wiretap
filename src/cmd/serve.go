@@ -38,6 +38,9 @@ import (
 type serveCmdConfig struct {
 	configFile        string
 	configData        string
+	configURL         string
+	authHeader        string
+	insecure          bool
 	clientAddr4E2EE   string
 	clientAddr6E2EE   string
 	clientAddr4Relay  string
@@ -130,6 +133,9 @@ func init() {
 	// Flags.
 	cmd.Flags().StringVarP(&serveCmd.configFile, "config-file", "f", serveCmd.configFile, "wireguard config file to read from")
 	cmd.Flags().StringVarP(&serveCmd.configData, "config-data", "", serveCmd.configData, "config data string")
+	cmd.Flags().StringVarP(&serveCmd.configURL, "config-url", "", serveCmd.configURL, "fetch config from URL")
+	cmd.Flags().StringVarP(&serveCmd.authHeader, "auth-header", "", serveCmd.authHeader, "auth header (format: 'Key: Value')")
+	cmd.Flags().BoolVarP(&serveCmd.insecure, "insecure", "", serveCmd.insecure, "skip TLS verification")
 	cmd.Flags().BoolVarP(&serveCmd.deleteConfig, "delete-config", "D", serveCmd.deleteConfig, "delete wireguard config file after ingesting it")
 	cmd.Flags().IntP("port", "p", wiretapDefault.port, "listener port to use for relay connections")
 	cmd.Flags().BoolVarP(&serveCmd.quiet, "quiet", "q", serveCmd.quiet, "silence wiretap log messages")
@@ -284,7 +290,7 @@ func (c serveCmdConfig) Run() {
 	viper.SetEnvPrefix("WIRETAP")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	if err := config.TryLoad(c.configData, c.configFile); err == nil {
+	if err := config.TryLoad(c.configData, c.configFile, c.configURL, c.authHeader, c.insecure); err == nil {
 		// Loaded successfully
 	} else if err.Error() != "no config" {
 		check("config load failed", err)
