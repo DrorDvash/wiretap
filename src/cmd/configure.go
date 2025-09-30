@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"wiretap/config"
 	"wiretap/peer"
 
 	"github.com/atotto/clipboard"
@@ -343,6 +344,7 @@ func (c configureCmdConfig) Run() {
 
 	// Write server config file and get status string.
 	var fileStatusServer string
+	var configDataEncoded string
 	file, err := os.Create(c.configFileServer)
 	if err != nil {
 		fileStatusServer = fmt.Sprintf("%s %s", RedBold("server config:"), Red(fmt.Sprintf("error creating server config file: %v", err)))
@@ -360,6 +362,22 @@ func (c configureCmdConfig) Run() {
 			fileStatusServer = fmt.Sprintf("%s %s", RedBold("server config:"), Red(fmt.Sprintf("error writing config file: %v", err)))
 		} else {
 			fileStatusServer = fmt.Sprintf("%s %s", GreenBold("server config:"), Green(c.configFileServer))
+		}
+
+		serverFileContent := peer.CreateServerFile(serverConfigRelay, serverConfigE2EE, c.simple)
+		configDataEncoded = config.Encode([]byte(serverFileContent))
+	}
+
+	// Write .enc file
+	var fileStatusEnc string
+	encFileName := c.configFileServer + ".enc"
+	encFileName = peer.FindAvailableFilename(encFileName)
+	if configDataEncoded != "" {
+		err = os.WriteFile(encFileName, []byte(configDataEncoded), 0600)
+		if err != nil {
+			fileStatusEnc = fmt.Sprintf("%s %s", RedBold("encoded config:"), Red(fmt.Sprintf("error writing file: %v", err)))
+		} else {
+			fileStatusEnc = fmt.Sprintf("%s %s", GreenBold("encoded config:"), Green(encFileName))
 		}
 	}
 
@@ -398,12 +416,22 @@ func (c configureCmdConfig) Run() {
 		fmt.Fprintln(color.Output)
 	}
 	fmt.Fprintln(color.Output, fileStatusServer)
+	if fileStatusEnc != "" {
+		fmt.Fprintln(color.Output, fileStatusEnc)
+	}
 	fmt.Fprintln(color.Output)
 	fmt.Fprintln(color.Output, GreenBold("server command:"))
 	fmt.Fprintln(color.Output, Cyan("POSIX Shell: "), Green(peer.CreateServerCommand(serverConfigRelay, serverConfigE2EE, peer.POSIX, c.simple, c.disableV6)))
 	fmt.Fprintln(color.Output, Cyan(" PowerShell: "), Green(peer.CreateServerCommand(serverConfigRelay, serverConfigE2EE, peer.PowerShell, c.simple, c.disableV6)))
 	fmt.Fprintln(color.Output, Cyan("Config File: "), Green(serverConfigFile))
 	fmt.Fprintln(color.Output)
+	if configDataEncoded != "" {
+		fmt.Fprintln(color.Output, GreenBold("config data:"))
+		fmt.Fprintln(color.Output, Green(strings.Repeat("─", 32)))
+		fmt.Fprintln(color.Output, Cyan("WIRETAP_CONFIG_DATA=")+Green(configDataEncoded))
+		fmt.Fprintln(color.Output, Green(strings.Repeat("─", 32)))
+		fmt.Fprintln(color.Output)
+	}
 	if c.writeToClipboard {
 		fmt.Fprintln(color.Output, clipboardStatus)
 		fmt.Fprintln(color.Output)

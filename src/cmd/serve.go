@@ -26,6 +26,7 @@ import (
 	gtcp "gvisor.dev/gvisor/pkg/tcpip/transport/tcp"
 	gudp "gvisor.dev/gvisor/pkg/tcpip/transport/udp"
 
+	"wiretap/config"
 	"wiretap/peer"
 	"wiretap/transport/api"
 	"wiretap/transport/icmp"
@@ -36,17 +37,18 @@ import (
 
 type serveCmdConfig struct {
 	configFile        string
+	configData        string
 	clientAddr4E2EE   string
 	clientAddr6E2EE   string
 	clientAddr4Relay  string
 	clientAddr6Relay  string
-	deleteConfig      bool // Add member to struct to delete server config file.
+	deleteConfig      bool
 	quiet             bool
 	debug             bool
 	simple            bool
 	logging           bool
 	logFile           string
-	showConfig        bool // Flag to control configuration output
+	showConfig        bool
 	catchTimeout      uint
 	connTimeout       uint
 	keepaliveIdle     uint
@@ -127,7 +129,7 @@ func init() {
 
 	// Flags.
 	cmd.Flags().StringVarP(&serveCmd.configFile, "config-file", "f", serveCmd.configFile, "wireguard config file to read from")
-	// Add flag to delete server config file.
+	cmd.Flags().StringVarP(&serveCmd.configData, "config-data", "", serveCmd.configData, "config data string")
 	cmd.Flags().BoolVarP(&serveCmd.deleteConfig, "delete-config", "D", serveCmd.deleteConfig, "delete wireguard config file after ingesting it")
 	cmd.Flags().IntP("port", "p", wiretapDefault.port, "listener port to use for relay connections")
 	cmd.Flags().BoolVarP(&serveCmd.quiet, "quiet", "q", serveCmd.quiet, "silence wiretap log messages")
@@ -278,12 +280,15 @@ func init() {
 // Run parses/processes/validates args and then connects to peer,
 // proxying traffic from peer into local network.
 func (c serveCmdConfig) Run() {
-	// Read config from file and/or environment.
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("WIRETAP")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	if c.configFile != "" {
+	if err := config.TryLoad(c.configData, c.configFile); err == nil {
+		// Loaded successfully
+	} else if err.Error() != "no config" {
+		check("config load failed", err)
+	} else if c.configFile != "" {
 		viper.SetConfigType("ini")
 		viper.SetConfigFile(c.configFile)
 		if err := viper.ReadInConfig(); err != nil {
